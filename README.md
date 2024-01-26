@@ -1,6 +1,6 @@
 # ChittiAssist
 
-Android based cloud-assistant (Google Gemini powered) through FLASK based server. 
+A simple android based cloud-assistant (Google Gemini powered) through FLASK based server. 
 
 User interacts with voice. 
 Query is extracted to text and routed to FLASK server.
