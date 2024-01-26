@@ -2,9 +2,7 @@ from flask import Flask,request,jsonify
 from flask_cors import CORS
 
 import time
-
 import urllib.request
-
 
 import base64
 import io
