@@ -2,9 +2,9 @@
 
 A simple android based cloud-assistant (Google Gemini powered) through FLASK based server. 
 
-User interacts with voice. 
+User interacts with app through voice. 
 Query is extracted to text and routed to FLASK server.
-FLASK server prompts the LLM with query and send the response back to App.
+FLASK server prompts the LLM with query and send the response back to app.
 App 'responds' to the user in voice. 
 
 [GET request for text query working. POST request for image query in progres.]
