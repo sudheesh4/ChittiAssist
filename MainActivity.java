@@ -25,6 +25,8 @@ import android.widget.Toast;
 
 
 import android.content.Context;
+
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
@@ -38,6 +40,11 @@ import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import android.speech.tts.TextToSpeech;
+
+import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
+import java.net.ProtocolException;
+import java.util.HashMap;
 import java.util.Locale;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -68,6 +75,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -138,8 +146,7 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 texter.setText("Chitti-ing! Please wait.");
-                String url = ""//POST api hit url for Flask server
-+query;
+                String url = ""+query;////GET request URL for FLASK server
                 String res;
 
                StringRequest ExampleStringRequest = new StringRequest(Request.Method.GET, url, new Response.Listener<String>() {
@@ -251,107 +258,48 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
+        String temp= editText.getText().toString().replace(" ","");
+        if (temp.length()<2){
+            editText.setText("Describe what you see");
+        }
+        textToSpeech.speak(editText.getText().toString(),TextToSpeech.QUEUE_FLUSH,null);
+        texter.setText("Chitti-ing! Please wait.");
         if(requestCode==100){
             Bitmap bitmap=(Bitmap) data.getExtras().get("data");
             imgview.setImageBitmap(bitmap);
-            Toast.makeText(this, "here1", Toast.LENGTH_SHORT).show();
-            //UploadImage(bitmap);
-
-
-            try {
-                payload.put("image", convertBitmapToBase64(bitmap));
-                payload.put("prompt", "Describe");
-                // Add more key-value pairs as needed
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-            // Make a POST request using Volley
-            makePostRequest(payload);
-        }
-
-    }
-
-
-    private void makePostRequest(JSONObject payload) {
-        String url = "";//POST api hit url for Flask server
-
-        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, payload,
-                new Response.Listener<JSONObject>() {
-                    @Override
-                    public void onResponse(JSONObject response) {
-                        // Handle the response from the server
-                        Log.d("Volley Response111", response.toString());
-                    }
-                },
-                new Response.ErrorListener() {
-                    @Override
-                    public void onErrorResponse(VolleyError error) {
-                        // Handle errors
-                        Log.e("Volley Erro2222r", "Error occurred", error);
-                    }
-                });
-
-        // Add the request to the request queue
-        VolleyHelper.getInstance(getApplicationContext()).addToRequestQueue(jsonObjectRequest);
-    }
-    private void UploadImage(Bitmap bitmap) {
-        String b64im=convertBitmapToBase64(bitmap);
-        String prompt;
-        String temp= String.valueOf(editText.getText());
-        temp=temp.replace(" ","");
-        String imurl="";//POST api hit url for Flask server
-
-        if (temp.length()<2){
-            prompt="Describe what you can make out from the image.";
-        }
-        else{
-            prompt=String.valueOf(editText.getText());
-        }
-
-        try {
-            Toast.makeText(this, "here2", Toast.LENGTH_SHORT).show();;
-            JSONObject jsonObject = new JSONObject();
-            jsonObject.put("image", b64im);
-            jsonObject.put("prompt", prompt);
-
-            jsonObjectRequest=new JsonObjectRequest(Request.Method.POST,
-                    ""//POST api hit url for Flask server
-, jsonObject,
-                    new Response.Listener<JSONObject>() {
-                        @Override
-                        public void onResponse(JSONObject response) {
-                            try {
-                                Toast.makeText(MainActivity.this, "here5", Toast.LENGTH_SHORT).show();;
-                                String msg= response.getString("desc");
-                                texter.setText(msg);
-                            } catch (JSONException e) {
-                                throw new RuntimeException(e);
-                            }
+            //Toast.makeText(this, "here1111", Toast.LENGTH_SHORT).show();
+            String url = "";//POST request URL for FLASK server
+            StringRequest stringRequestpost=new StringRequest(Request.Method.POST,url,
+                    response ->{String message="";
+                        try {
+                            JSONObject api_response = new JSONObject(response);
+                            message = api_response.getString("desc");
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
-                    }, new Response.ErrorListener() {
+                        texter.setText(message);
+                        textToSpeech.speak(message,TextToSpeech.QUEUE_FLUSH,null);
+                    //Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+                        editText.setText("");
+                        },
+                    error ->{
+                        texter.setText("ERROR CONNECTING.");
+                        editText.setText("Describe what you see");
+            }){
                 @Override
-                public void onErrorResponse(VolleyError error) {
-                   Toast.makeText(MainActivity.this, "hereer", Toast.LENGTH_SHORT).show();;
-                    texter.setText("Error in handling image.");
-                    Log.e("Volley Error", "Error occurred", error);
-
-                    NetworkResponse networkResponse = error.networkResponse;
-                    if (networkResponse != null) {
-                        Log.e("Volley Error2", "Status Code: " + networkResponse.statusCode);
-                        Log.e("Volley Error33", "Response Body: " + new String(networkResponse.data));
-                    }
+                protected Map<String,String> getParams() throws AuthFailureError{
+                    Map<String,String> params = new HashMap<>();
+                    params.put("image",convertBitmapToBase64(bitmap));
+                    params.put("prompt",editText.getText().toString());
+                    return params;
                 }
-            }
-            );
+            };
+            RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
+            requestQueue.add(stringRequestpost);
+
         }
-        catch (JSONException e){
-            e.printStackTrace();
-        }
-        Toast.makeText(this, "here3", Toast.LENGTH_SHORT).show();;
-        RequestQueue imreq = Volley.newRequestQueue(MainActivity.this);
-        imreq.add(jsonObjectRequest);
-        Toast.makeText(this, "here4", Toast.LENGTH_SHORT).show();;
+
     }
 
     private String convertBitmapToBase64(Bitmap bitmap) {
@@ -375,43 +323,5 @@ public class MainActivity extends AppCompatActivity {
 
 };
 
-/*private static class HttpGetTask extends AsyncTask<String, Void, String> {
-    @Override
-    protected String doInBackground(String... params) {
-        String apiUrl = params[0];
-        try {
-            URL url = new URL(apiUrl);
-            HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
-
-            try {
-                BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(urlConnection.getInputStream()));
-                StringBuilder stringBuilder = new StringBuilder();
-                String line;
-
-                while ((line = bufferedReader.readLine()) != null) {
-                    stringBuilder.append(line).append("\n");
-                }
-
-                return stringBuilder.toString();
-            } finally {
-                urlConnection.disconnect();
-            }
-        } catch (IOException e) {
-            Log.e("HTTP GET", "Error making GET request", e);
-            return null;
-        }
-    }
-
-    @Override
-    protected void onPostExecute(String result) {
-        if (result != null) {
-            Log.d("HTTP GET", "Response: " + result);
-            // Handle the response here
-        } else {
-            Log.e("HTTP GET", "Failed to get response");
-        }
-    }
-}
-};*/
 
 
