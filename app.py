@@ -162,7 +162,28 @@ def handle_image():
     except:
         return jsonify({'msg': 'fail', 'desc':"Error Processing image."})
 
+
+@app.route('/api/search',methods=['GET'])
+def handle_search():
+    try:
+        #from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain.agents import AgentType,initialize_agent,load_tools
+        from langchain.llms import GooglePalm
         
+        import langchain
+        langchain.debug=True
+        PALM_API=""#PALM API key    
+        llm = GooglePalm(google_api_key=PALM_API,temperature=0.03,maxOutputTokens=4000)#ChatGoogleGenerativeAI(model="gemini-pro", google_api_key=API)
+    
+        serp_key=""#google search API key ###pip install google-search-results
+        os.environ['SERPAPI_API_KEY']=serp_key
+        tools=load_tools(["serpapi"],llm=llm)
+        agent=initialize_agent(tools,llm,agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,handle_parsing_errors=True)
+        res=agent.run((request.query_string).decode('ascii'))
+        print(res)
+    except:
+        res="Error searching."
+    return jsonify({"message":res})
 
 
 @app.route('/api/image2',methods=["POST"])
