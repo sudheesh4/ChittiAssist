@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import android.text.method.ScrollingMovementMethod;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -27,6 +28,7 @@ import android.widget.Toast;
 import android.content.Context;
 
 import com.android.volley.AuthFailureError;
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.Volley;
@@ -81,7 +83,25 @@ public class MainActivity extends AppCompatActivity {
 
     ImageButton imageButton;
     ImageButton camerab;
+
+    ImageButton clearb;
     ImageView imgview;
+
+    ImageButton converse;
+    Boolean conversing;
+
+    ImageButton search;
+    String preprompt="You are a personal assistant, named Chitti, to user. Look at the summary and conversation to respond and assist the user for their query." +
+            " If the query is simple, execute it." +
+            " If there are multiple steps or questions that need further clarification request user for those. " +
+            "If summary is given, use that to inform your response to the conversation.  " +
+            "If the user query is finished return 'FINISHED_QUERY'. SUMMARY:";
+    String preconv="\n\nCONVERSATION: \n" +
+            "Chitti: Hi I am Chitti. How can I assist you?\n" +
+            "User: Can you assist me with my query?\n" +
+            "Chitti: Sure! Let me know how can I help you";
+    String currconv="";
+    String currsumm="";
     Button sendButton;
     TextView texter;
     int count = 0;
@@ -93,6 +113,8 @@ public class MainActivity extends AppCompatActivity {
     //private JsonObjectRequest jsonObjectRequest;
     JSONObject payload = new JSONObject();
     JsonObjectRequest jsonObjectRequest;
+    StringRequest ExampleStringRequest;
+    RequestQueue ExampleRequestQueue;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -104,9 +126,17 @@ public class MainActivity extends AppCompatActivity {
 
         sendButton = findViewById(R.id.send);
         texter = findViewById(R.id.texter);
+        texter.setMovementMethod(new ScrollingMovementMethod());
 
         camerab= findViewById(R.id.camera);
         imgview = findViewById(R.id.imageView);
+
+        clearb = findViewById(R.id.clear);
+
+        converse=findViewById(R.id.converse);
+        conversing= false;
+
+        search=findViewById(R.id.search);
 
         textToSpeech = new TextToSpeech(getApplicationContext(), new TextToSpeech.OnInitListener() {
             @Override
@@ -119,7 +149,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
-        RequestQueue ExampleRequestQueue = Volley.newRequestQueue(this);
+        ExampleRequestQueue = Volley.newRequestQueue(this);
 
         if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) !=
                 PackageManager.PERMISSION_GRANTED) {
@@ -146,10 +176,11 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
                 texter.setText("Chitti-ing! Please wait.");
-                String url = ""+query;////GET request URL for FLASK server
+                String url = "";//FLASK Get request url
                 String res;
 
-               StringRequest ExampleStringRequest = new StringRequest(Request.Method.GET, url, new Response.Listener<String>() {
+                if(conversing==false){
+               ExampleStringRequest = new StringRequest(Request.Method.GET, url+query, new Response.Listener<String>() {
                     @Override
                     public void onResponse(String response) {
                         respon=response.toString();
@@ -170,7 +201,48 @@ public class MainActivity extends AppCompatActivity {
                         editText.setText("");
                         textToSpeech.speak(respon,TextToSpeech.QUEUE_FLUSH,null);
                     }
-                });
+                });}
+                else{
+                    String prompt=preprompt+currconv+"\nUser:"+query+"\nChitti:";
+                    ExampleStringRequest = new StringRequest(Request.Method.GET, url+prompt, new Response.Listener<String>() {
+                        @Override
+                        public void onResponse(String response) {
+                            respon=response.toString();
+                            //Toast.makeText(MainActivity.this, response, Toast.LENGTH_SHORT).show();
+
+                            respon=respon.replace("\"message\":","");
+                            respon=respon.replace("\\n"," ");
+                            respon=respon.replace("\\t","");
+
+                            respon=respon.replace("{","").replace("}","");
+                            respon=respon.replace("%20"," ").replace("%22","");
+
+                            texter.setText(currconv+"\nUser: "+query+"\n Chitti: "+respon);
+                            currconv=currconv+"\nUser: "+query+"\n Chitti: "+respon;
+                            editText.setText("");
+                            textToSpeech.speak(respon,TextToSpeech.QUEUE_FLUSH,null);
+
+                            if(respon.indexOf("FINISHED_QUERY")>=0){
+                                conversing=false;
+                                currconv="";
+                                Toast.makeText(MainActivity.this, "Conversing mode off.", Toast.LENGTH_SHORT).show();
+                            }
+                            //This code is executed if the server responds, whether or not the response contains data.
+                        }
+                    }, new Response.ErrorListener() { //Create an error listener to handle errors appropriately.
+                        @Override
+                        public void onErrorResponse(VolleyError error) {
+                            //This code is executed if there is an error.
+                            respon="ERROR";
+                            texter.setText("Query: "+query+" \n Response: "+respon);
+                            editText.setText("");
+                            textToSpeech.speak(respon,TextToSpeech.QUEUE_FLUSH,null);
+                            conversing=false;
+                            currconv="";
+                            Toast.makeText(MainActivity.this, "Conversing mode off.", Toast.LENGTH_SHORT).show();
+
+                        }
+                    });}
 
                 ExampleRequestQueue.add(ExampleStringRequest);
 
@@ -202,6 +274,76 @@ public class MainActivity extends AppCompatActivity {
                 startActivityForResult(cameraintent,100);
             }
 
+        });
+
+        clearb.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                texter.setText("");
+                editText.setText("");
+                imgview.setImageResource(0);
+
+            }
+        });
+
+        converse.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(conversing==false){
+                    conversing=true;
+                    currconv=""+preconv;
+                    Toast.makeText(MainActivity.this, "Conversing mode on.", Toast.LENGTH_SHORT).show();
+                    return ;
+                }
+                conversing=false;
+                currconv="";
+                Toast.makeText(MainActivity.this, "Conversing mode off.", Toast.LENGTH_SHORT).show();
+
+            }
+        });
+
+        search.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String temp= editText.getText().toString().replace(" ","");
+                if (temp.length()<2){
+                    texter.setText("No Query!");
+                    textToSpeech.speak("No Query!",TextToSpeech.QUEUE_FLUSH,null);
+                    return;
+                }
+                texter.setText("Chitti-ing! Please wait.");
+                String url = ";////FLASK Get request url for searching
+                String res;
+                String query=editText.getText().toString();
+                Log.e("urleae",url+query,null);
+                StringRequest extr = new StringRequest(Request.Method.GET, url+query, new Response.Listener<String>() {
+                    @Override
+                    public void onResponse(String response) {
+                        respon=response.toString();
+                        respon=respon.replace("\"message\":","");
+                        respon=respon.replace("\\n"," ");
+                        respon=respon.replace("\\t","");
+                        texter.setText("Query: "+query+" \n Response: "+respon);
+                        editText.setText("");
+                        textToSpeech.speak(respon,TextToSpeech.QUEUE_FLUSH,null);
+                        //This code is executed if the server responds, whether or not the response contains data.
+                    }
+                }, new Response.ErrorListener() { //Create an error listener to handle errors appropriately.
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        //This code is executed if there is an error.
+                        respon="ERROR";
+                        texter.setText("Query: "+query+" \n Response: "+respon);
+                        editText.setText("");
+                        Log.e("errorasfe","volley",error);
+                        textToSpeech.speak(respon,TextToSpeech.QUEUE_FLUSH,null);
+                    }
+                });
+                extr.setRetryPolicy(new DefaultRetryPolicy(15000,
+                        DefaultRetryPolicy.DEFAULT_MAX_RETRIES,
+                        DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+                ExampleRequestQueue.add(extr);
+            }
         });
 
         speechRecognizer.setRecognitionListener(new RecognitionListener() {
@@ -269,7 +411,7 @@ public class MainActivity extends AppCompatActivity {
             Bitmap bitmap=(Bitmap) data.getExtras().get("data");
             imgview.setImageBitmap(bitmap);
             //Toast.makeText(this, "here1111", Toast.LENGTH_SHORT).show();
-            String url = "";//POST request URL for FLASK server
+            String url = "";////FLASK Post request url for image
             StringRequest stringRequestpost=new StringRequest(Request.Method.POST,url,
                     response ->{String message="";
                         try {
@@ -294,10 +436,9 @@ public class MainActivity extends AppCompatActivity {
                     params.put("prompt",editText.getText().toString());
                     return params;
                 }
-            };
+            };//textToSpeech.speak(respon,TextToSpeech.QUEUE_FLUSH,null);
             RequestQueue requestQueue = Volley.newRequestQueue(MainActivity.this);
             requestQueue.add(stringRequestpost);
-
         }
 
     }
@@ -322,6 +463,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
 };
+
 
 
 
